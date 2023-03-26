@@ -1,0 +1,1 @@
+C:\Users\Jordan\.p2\pool\plugins\org.eclipse.justj.openjdk.hotspot.jre.full.win32.x86_64_17.0.6.v20230204-1729\jre\bin\java.exe -Dfile.encoding=UTF-8 -classpath "C:\Users\Jordan\eclipse-workspace\KIT318_Assignment1_Sockets\bin" -XX:+ShowCodeDetailsInExceptionMessages MainWorker

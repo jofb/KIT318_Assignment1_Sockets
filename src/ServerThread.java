@@ -1,15 +1,17 @@
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 class ServerThread extends Thread {
 	
 	Socket serverClient;
 	int clientNumber;
 	
-	private volatile List<Integer> averages = new ArrayList<>();
-	private volatile List<List<Integer>> data = new ArrayList<>();
+	private volatile Map<String, List<Integer>> data = new HashMap<>();
+	private volatile Map<String, Integer> averages = new HashMap<>();
 	
 	ServerThread(Socket inSocket, int counter) {
 		serverClient = inSocket;
@@ -20,47 +22,36 @@ class ServerThread extends Thread {
 		try {
 			DataOutputStream output = new DataOutputStream(serverClient.getOutputStream());
 			BufferedReader input = new BufferedReader(new InputStreamReader(serverClient.getInputStream()));
-
-			List<Integer> t1 = new ArrayList<>();
-			t1.add(15);
-			t1.add(15);
-			t1.add(30);
 			
-			List<Integer> t2 = new ArrayList<>();
-			t2.add(20);
-			t2.add(40);
-			t2.add(60);
-			
-			//data.add(t1);
-			//data.add(t2);
-
-			// loop through given data and provide to worker
-			for(List<Integer> list : data) {
-				// remove all formatting from to string method
-				String out = list.toString().replaceAll("\\s|\\[|\\]", "");
+			// loop through given data and pass to worker
+			for(Map.Entry<String, List<Integer>> entry : data.entrySet())
+			{
+				// format the out string
+				String out = entry.getValue().toString().replaceAll("\\s|\\[|\\]", "");
 				// output the list of numbers
 				output.writeBytes(out + "\n");
-				// then get the average back from the input
-				averages.add(Integer.parseInt(input.readLine()));
+				// then add average to the return map
+				averages.put(entry.getKey(), Integer.parseInt(input.readLine()));
 			}
 
-			System.out.println("AVG : " + averages.toString());
-
+			// closing streams
 			input.close();
 			output.close();
 			serverClient.close();
 		} catch(Exception e) {
 			System.out.println(e);
 		} finally {
-			System.out.println("Client - " + clientNumber + " exit!");
+			//System.out.println("Client - " + clientNumber + " exit!");
 		}
 	}
-	
-	public List<Integer> getAverages() {
+
+	// getters and setters for input/output
+	public Map<String, Integer> getAverages()
+	{
 		return averages;
 	}
 	
-	public void setData(List<List<Integer>> d) {
+	public void setData(Map<String, List<Integer>> d) {
 		data = d;
 	}
 }

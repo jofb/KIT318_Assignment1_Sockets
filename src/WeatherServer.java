@@ -6,18 +6,37 @@ public class WeatherServer{
 	public static void main(String[] args) throws Exception {
 		/* args list
 		 * 0: input path
-		 * 1: number of threads
+		 * 1: output path
+		 * 2: number of threads
 		 * */
 		
-		// final list of averages
-		List<Integer> averages = new ArrayList<>();
+		// timing variables
+		long oldTime = 0, newTime;
 		
-		// no error checking here, just be careful
-		int threads = Integer.parseInt(args[1]);
+		String inputPath = args[0];
+		String outputPath = args[1];		
+		//int threads = Integer.parseInt(args[2]); 
+		int threads = 16;
+		
+		// final list of averages
+		Map<String, Integer> averages = new HashMap<>();
+		
+		// map of all values with keys
+	  	Map<String, List<Integer>> data = new HashMap<>();
+	  	
+	  	// list of maps, to be allocated to each thread
+	  	List<Map<String, List<Integer>>> threadData = new ArrayList<>();
+
+	  	/* weather data
+	  	 * 0: weather station id
+	  	 * 1: date in format (YYYYMMDD)
+	  	 * 2: temp type
+	  	 * 3: temp value
+	  	 * */
 		// read in input from csv file, adapted from https://www.baeldung.com/java-csv-file-array
-		List<List<String>> records = new ArrayList<>();
-	  	try (Scanner scanner = new Scanner(new File(args[0]));) {
+	  	try (Scanner scanner = new Scanner(new File(inputPath));) {
 	  		while (scanner.hasNextLine()) {
+	  			// values on each line as a list
 	  			List<String> values = new ArrayList<String>();
 	  			try (Scanner rowScanner = new Scanner(scanner.nextLine())) {
 	  				rowScanner.useDelimiter(",");
@@ -27,44 +46,37 @@ public class WeatherServer{
 	  			}
 	  			// we only care about the records covering TMAX
 	  			if(values.get(2).equals("TMAX"))
-	  				records.add(values);
+	  			{
+	  				// mapping all temperature values into unique keys based on station ID + month
+	  				// generate a unique key, format: stationID, MM
+	  				String key = values.get(0) + "," + values.get(1).substring(4,6);
+	  		  		// if key doesn't already exist, create new list
+	  		  		if(!data.containsKey(key))
+	  		  			data.put(key, new ArrayList<Integer>());
+
+	  		  		// then add our temperature value
+	  	  			data.get(key).add(Integer.parseInt(values.get(3)));
+	  			}
 	  		}
 	  	}
 
-	  	Map<String, List<Integer>> data = new HashMap<>();
-	  	Map<String, Integer> output = new HashMap<>();
-	  	
-	  	// Maps all temperature values into unique keys based on weather station ID + month
-	  	for(List<String> line : records) {
-	  		// formatted key: stationID, MM
-	  		String key = line.get(0) + ", " + line.get(1).substring(4,6);
-	  		// if key doesn't already exist, create new list
-	  		if(!data.containsKey(key))
-	  			data.put(key, new ArrayList<Integer>());
-
-	  		// then add our temperature value
-  			data.get(key).add(Integer.parseInt(line.get(3)));
+	  	// initializing maps in the threadData lists
+	  	for(int j = 0; j < threads; j++)
+	  	{
+	  		threadData.add(j, new HashMap<>());
 	  	}
 	  	
-	  	System.out.println(data.get("ITE00100550, 01"));
-	  	
-	  	List<List<Integer>> test = new ArrayList<>();
+	  	int i = 0;
+	  	// iterate over entries, adapted from https://stackoverflow.com/questions/4234985/how-to-for-each-the-hashmap
+	  	// allocates smaller maps for each thread
+	  	for(Map.Entry<String, List<Integer>> entry : data.entrySet())
+	  	{
+	  		if(i > threads - 1)
+	  			i = 0;
+	  		threadData.get(i).put(entry.getKey(), entry.getValue());
+		  	i++;
 
-	  	for(List<Integer> p : data.values()) {
-	  		test.add(p);
 	  	}
-	  	
-	  	// lets try splitting evenly / # of threads
-	  	
-	  	// next step is to split up based on id-month
-	  	
-	  	/* weather data
-	  	 * 0: weather station id
-	  	 * 1: date in format (YYYYMMDD)
-	  	 * 2: temp type
-	  	 * 3: temp value
-	  	 * */
-	  	
 	  	
 		// socket stuff
 		try {
@@ -82,33 +94,45 @@ public class WeatherServer{
 				// add thread to list with client inside
 				serverThreads.add(new ServerThread(serverClient, counter));
 			}
-			// then start all of them
+			// start timer
+			oldTime = System.currentTimeMillis();
+			// start all workers sequentially
 			for(ServerThread thread : serverThreads) {
 				// start thread
-				System.out.println(" >> Client No: " + thread.clientNumber + " started!");
-				thread.setData(test);
+				//System.out.println(" >> Client No: " + thread.clientNumber + " started!");
+				thread.setData(threadData.get(thread.clientNumber - 1));
 				thread.start();
+				
 			}
-
 			// wait for each thread to finish, then add its results to a list
 			for(ServerThread thread : serverThreads) {
 				thread.join();
-				averages.addAll(thread.getAverages());
+				// aggregate averages from each thread
+				averages.putAll(thread.getAverages());
 			}
 			
-			// this is the final list
-			System.out.println(averages.toString());
+			server.close();
 			
 		} catch(Exception e) {
 			System.out.println(e);
 		}
-	}
-}
+		
+		// write to csv file using file writer
+		File csvOutput = new File(outputPath);
+		FileWriter fileWriter = new FileWriter(csvOutput);
+		
+	  	for(Map.Entry<String, Integer> entry : averages.entrySet())
+	  	{
+	  		// small bit of formatting 
+	  		String line = entry.toString().replace('=', ',') + "\n";
+	  		fileWriter.write(line);
+	  	}
+	  	
+	  	fileWriter.close();
+	  	
+	  	// for timing
+	  	newTime = System.currentTimeMillis();
 
-// comparator class to sort the list of strings based on first item
-class Sorter implements Comparator<List<String>> {
-	
-	public int compare(List<String> s1, List<String> s2) {
-		return s1.get(0).compareTo(s2.get(0));
+	  	System.out.println("Time Taken : " + (newTime - oldTime) + "ms");
 	}
 }
