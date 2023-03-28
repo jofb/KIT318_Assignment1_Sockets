@@ -10,14 +10,18 @@ public class WeatherServer{
 		 * 2: number of threads
 		 * */
 		
+		String inputPath = args[0];
+		String outputPath = args[1];
+
+		// either manually set threads or leave to args
+		int threads = Integer.parseInt(args[2]); 
+		threads = 4; // manual thread settings
+		
 		// timing variables
 		long oldTime = 0, newTime;
-		
-		String inputPath = args[0];
-		String outputPath = args[1];		
-		//int threads = Integer.parseInt(args[2]); 
-		int threads = 16;
-		
+		// these are used to omit the connection time from the total time
+		long timeConnectOne = 0, timeConnectTwo = 0;
+
 		// final list of averages
 		Map<String, Integer> averages = new HashMap<>();
 		
@@ -27,15 +31,18 @@ public class WeatherServer{
 	  	// list of maps, to be allocated to each thread
 	  	List<Map<String, List<Integer>>> threadData = new ArrayList<>();
 
-	  	/* weather data
-	  	 * 0: weather station id
-	  	 * 1: date in format (YYYYMMDD)
-	  	 * 2: temp type
-	  	 * 3: temp value
-	  	 * */
+	  	// start timer
+	  	oldTime = System.currentTimeMillis();
+
 		// read in input from csv file, adapted from https://www.baeldung.com/java-csv-file-array
 	  	try (Scanner scanner = new Scanner(new File(inputPath));) {
 	  		while (scanner.hasNextLine()) {
+	  		  	/* weather data
+	  		  	 * 0: weather station id
+	  		  	 * 1: date in format (YYYYMMDD)
+	  		  	 * 2: temp type
+	  		  	 * 3: temp value
+	  		  	 * */
 	  			// values on each line as a list
 	  			List<String> values = new ArrayList<String>();
 	  			try (Scanner rowScanner = new Scanner(scanner.nextLine())) {
@@ -80,6 +87,9 @@ public class WeatherServer{
 	  	
 		// socket stuff
 		try {
+			// start connection timer
+		  	timeConnectOne = System.currentTimeMillis();
+		  	
 			// list of server threads
 			List<ServerThread> serverThreads = new ArrayList<>();
 			ServerSocket server = new ServerSocket(8888);
@@ -94,12 +104,13 @@ public class WeatherServer{
 				// add thread to list with client inside
 				serverThreads.add(new ServerThread(serverClient, counter));
 			}
-			// start timer
-			oldTime = System.currentTimeMillis();
+			// end connection timer
+			timeConnectTwo = System.currentTimeMillis();
+			
 			// start all workers sequentially
 			for(ServerThread thread : serverThreads) {
 				// start thread
-				//System.out.println(" >> Client No: " + thread.clientNumber + " started!");
+				System.out.println(" >> Client No: " + thread.clientNumber + " started!");
 				thread.setData(threadData.get(thread.clientNumber - 1));
 				thread.start();
 				
@@ -123,16 +134,22 @@ public class WeatherServer{
 		
 	  	for(Map.Entry<String, Integer> entry : averages.entrySet())
 	  	{
-	  		// small bit of formatting 
+	  		// small bit of formatting for csv file
 	  		String line = entry.toString().replace('=', ',') + "\n";
 	  		fileWriter.write(line);
 	  	}
 	  	
 	  	fileWriter.close();
 	  	
-	  	// for timing
+	  	// timing
 	  	newTime = System.currentTimeMillis();
+	  	
+	  	// tiemWithConnection includes the time it took to connect to workers, time omits that
+	  	long timeWithConnection = newTime - oldTime;
+	  	long time = (newTime - oldTime) - (timeConnectTwo - timeConnectOne);
 
-	  	System.out.println("Time Taken : " + (newTime - oldTime) + "ms");
+	  	System.out.println("Time Taken (w/ connection time): " + timeWithConnection + "ms");
+	  	System.out.println("Time Taken (w/out connection time): " + time + "ms");
+
 	}
 }

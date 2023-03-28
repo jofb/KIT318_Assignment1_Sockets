@@ -41,7 +41,7 @@ class ServerThread extends Thread {
 		} catch(Exception e) {
 			System.out.println(e);
 		} finally {
-			//System.out.println("Client - " + clientNumber + " exit!");
+			System.out.println("Client - " + clientNumber + " exit!");
 		}
 	}
 

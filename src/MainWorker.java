@@ -4,9 +4,9 @@ public class MainWorker {
 	public static void main(String[] args) throws Exception {
 		try{
 			BufferedReader br=new BufferedReader(new InputStreamReader(System.in));
-			int totalclients = 16;
-			//System.out.println("Enter number of clients :");
-			//int totalclients = Integer.parseInt(br.readLine());
+			//int totalclients = 4;
+			System.out.println("Enter number of clients :");
+			int totalclients = Integer.parseInt(br.readLine());
 			int clientnumber = 0;
 			while(clientnumber < totalclients){
 				Socket clientSocket=new Socket("127.0.0.1",8888);
